@@ -62,12 +62,15 @@ main {
   gap: 10px;
   border-bottom: 1px solid var(--border);
 }
-.section-header h2 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--primary);
-}
+.section-header h2 { font-size: 1rem; font-weight: 700; color: var(--primary); }
 .section-body { padding: 24px; }
+
+/* ── Divider inside section ────────────────────────────────────────────── */
+.section-divider {
+  border: none;
+  border-top: 1.5px dashed var(--border);
+  margin: 20px 0;
+}
 
 /* ── Form controls ─────────────────────────────────────────────────────── */
 .form-row {
@@ -90,6 +93,8 @@ input[type=text], input[type=date], select {
 }
 input[type=text]:focus, input[type=date]:focus, select:focus { border-color: var(--primary); }
 select { cursor: pointer; }
+
+/* ── Buttons ────────────────────────────────────────────────────────────── */
 .btn {
   padding: 9px 22px;
   border: none;
@@ -105,6 +110,17 @@ select { cursor: pointer; }
 .btn-primary:hover { opacity: .88; }
 .btn-danger  { background: #ef4444; color: #fff; }
 .btn-danger:hover { opacity: .88; }
+.btn-sm { padding: 5px 12px; font-size: .8rem; border-radius: 6px; }
+.btn-outline {
+  background: transparent;
+  border: 1.5px solid var(--primary);
+  color: var(--primary);
+}
+.btn-outline:hover { background: var(--primary-bg); }
+.btn-success { background: #22c55e; color: #fff; }
+.btn-success:hover { opacity: .88; }
+.btn-ghost { background: var(--bg); color: var(--muted); border: 1.5px solid var(--border); }
+.btn-ghost:hover { background: var(--border); }
 
 /* ── Toast ─────────────────────────────────────────────────────────────── */
 #toast {
@@ -127,6 +143,15 @@ select { cursor: pointer; }
 #toast.success { background: #22c55e; }
 #toast.error   { background: #ef4444; }
 
+/* ── Borrow inline feedback ────────────────────────────────────────────── */
+#borrow-msg {
+  margin-top: 12px;
+  font-size: .88rem;
+  font-weight: 600;
+  min-height: 20px;
+  transition: opacity .3s;
+}
+
 /* ── Table ─────────────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; font-size: .9rem; }
@@ -141,10 +166,14 @@ th {
   color: var(--muted);
   border-bottom: 1px solid var(--border);
 }
-td { padding: 11px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: middle; }
 tr:last-child td { border-bottom: none; }
 tbody tr:hover td { background: #f8faff; }
+tbody tr.editing td { background: #fffbeb; }
 .empty-row td { text-align: center; color: var(--muted); padding: 28px; }
+td input[type=text] { padding: 6px 10px; font-size: .88rem; width: 100%; min-width: 80px; }
+td select { padding: 6px 10px; font-size: .88rem; }
+.ops-cell { white-space: nowrap; display: flex; gap: 6px; }
 
 /* ── Genre badge ───────────────────────────────────────────────────────── */
 .genre {
@@ -235,7 +264,7 @@ tbody tr:hover td { background: #f8faff; }
 <main>
 
   <!-- ══════════════════════════════════════════════════════════════
-       1. 書籍列表區
+       1. 書籍列表區（含新增表單、編輯、刪除）
   ════════════════════════════════════════════════════════════════ -->
   <section class="section" id="sec-books">
     <div class="section-header">
@@ -243,6 +272,31 @@ tbody tr:hover td { background: #f8faff; }
       <h2>書籍列表</h2>
     </div>
     <div class="section-body">
+
+      <!-- 新增書籍表單 -->
+      <div style="margin-bottom:4px;font-size:.82rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.05em">新增書籍</div>
+      <div class="form-row" style="margin-bottom:6px">
+        <label style="flex:2;min-width:140px">
+          書名
+          <input type="text" id="add-title" placeholder="請輸入書名">
+        </label>
+        <label style="min-width:110px">
+          類型
+          <select id="add-genre">
+            <option>小說</option><option>科普</option>
+            <option>商業</option><option>歷史</option><option>漫畫</option>
+          </select>
+        </label>
+        <label style="flex:1.5;min-width:120px">
+          作者
+          <input type="text" id="add-author" placeholder="請輸入作者（選填）">
+        </label>
+        <button class="btn btn-primary" onclick="addBook()" style="align-self:flex-end">＋ 新增書籍</button>
+      </div>
+
+      <hr class="section-divider">
+
+      <!-- 篩選列 -->
       <div class="form-row" style="margin-bottom:16px">
         <label>
           依類型篩選
@@ -253,15 +307,17 @@ tbody tr:hover td { background: #f8faff; }
           </select>
         </label>
       </div>
+
+      <!-- 書籍表格 -->
       <div class="table-wrap">
         <table>
           <thead>
             <tr>
-              <th>#</th><th>書名</th><th>類型</th><th>作者</th>
+              <th>#</th><th>書名</th><th>類型</th><th>作者</th><th>操作</th>
             </tr>
           </thead>
           <tbody id="book-tbody">
-            <tr><td colspan="4" style="text-align:center;padding:20px">
+            <tr><td colspan="5" style="text-align:center;padding:20px">
               <span class="spinner"></span>載入中…
             </td></tr>
           </tbody>
@@ -298,6 +354,8 @@ tbody tr:hover td { background: #f8faff; }
           <button type="submit" class="btn btn-primary" style="align-self:flex-end">借閱</button>
         </div>
       </form>
+      <!-- 借閱回饋訊息 -->
+      <div id="borrow-msg"></div>
     </div>
   </section>
 
@@ -325,13 +383,13 @@ tbody tr:hover td { background: #f8faff; }
       </div>
 
       <div id="rec-result" style="display:none">
-        <!-- 分類 badge -->
+        <!-- a. 借閱者類型 badge -->
         <div id="rec-badge"></div>
         <!-- 描述 -->
         <div id="rec-desc" style="font-size:.88rem;color:var(--muted);margin-bottom:16px"></div>
-        <!-- 特徵數值 -->
+        <!-- b. 特徵數值 -->
         <div class="feature-grid" id="rec-features"></div>
-        <!-- 推薦書單 -->
+        <!-- c. 推薦書單 -->
         <div class="rec-title">📚 推薦書單</div>
         <div class="rec-list" id="rec-list"></div>
       </div>
@@ -347,7 +405,20 @@ tbody tr:hover td { background: #f8faff; }
 
 <script>
 // ── 常數 ───────────────────────────────────────────────────────────────────
+const GENRES     = ['小說', '科普', '商業', '歷史', '漫畫'];
 const GENRE_ICON = { 小說:'📕', 科普:'🔬', 商業:'💼', 歷史:'🏛️', 漫畫:'🎨' };
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function typeEmoji(t) {
+  return { '專注型重度讀者':'🎯','博覽型重度讀者':'🌐','專注型輕度讀者':'🔍','探索型輕度讀者':'🧭' }[t] || '';
+}
+function genreSelect(selected = '小說') {
+  return `<select class="genre-sel">${GENRES.map(g =>
+    `<option${g === selected ? ' selected' : ''}>${g}</option>`).join('')}</select>`;
+}
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 function toast(msg, type = 'success') {
@@ -369,76 +440,222 @@ async function api(url, opts = {}) {
   return data;
 }
 
-// ── 1. 書籍列表 ────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// 1. 書籍列表
+// ══════════════════════════════════════════════════════════════
+
 async function loadBooks() {
   const genre = document.getElementById('genre-filter').value;
-  const url = genre ? `/api/books?genre=${encodeURIComponent(genre)}` : '/api/books';
+  const url   = genre ? `/api/books?genre=${encodeURIComponent(genre)}` : '/api/books';
   const tbody = document.getElementById('book-tbody');
-  tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:20px"><span class="spinner"></span>載入中…</td></tr>`;
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:20px"><span class="spinner"></span>載入中…</td></tr>`;
 
   try {
     const books = await api(url);
     if (!books.length) {
-      tbody.innerHTML = `<tr class="empty-row"><td colspan="4">此類型尚無書籍</td></tr>`;
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="5">此類型尚無書籍</td></tr>`;
       return;
     }
-    tbody.innerHTML = books.map(b => `
-      <tr>
-        <td style="color:var(--muted);font-size:.82rem">${b.id}</td>
-        <td><strong>${esc(b.title)}</strong></td>
-        <td><span class="genre genre-${b.genre}">${b.genre}</span></td>
-        <td style="color:var(--muted)">${esc(b.author ?? '—')}</td>
-      </tr>
-    `).join('');
+    tbody.innerHTML = books.map(b => bookRow(b)).join('');
   } catch (e) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="4" style="color:#ef4444">載入失敗：${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="5" style="color:#ef4444">載入失敗：${esc(e.message)}</td></tr>`;
   }
+}
+
+// 產生靜態書籍列
+function bookRow(b) {
+  return `<tr data-id="${b.id}" data-title="${esc(b.title)}" data-genre="${esc(b.genre)}" data-author="${esc(b.author ?? '')}">
+    <td style="color:var(--muted);font-size:.82rem">${b.id}</td>
+    <td><strong>${esc(b.title)}</strong></td>
+    <td><span class="genre genre-${b.genre}">${b.genre}</span></td>
+    <td style="color:var(--muted)">${esc(b.author ?? '—')}</td>
+    <td><div class="ops-cell">
+      <button class="btn btn-sm btn-outline" onclick="editBook(${b.id})">編輯</button>
+      <button class="btn btn-sm btn-danger"  onclick="deleteBook(${b.id})">刪除</button>
+    </div></td>
+  </tr>`;
 }
 
 // 同步書籍到借閱下拉選單
 async function loadBookSelect() {
   const books = await api('/api/books');
   const sel = document.getElementById('borrow-book');
-  books.forEach(b => {
-    const opt = new Option(`${b.title}（${b.genre}）`, b.id);
-    sel.appendChild(opt);
-  });
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— 請選擇書籍 —</option>';
+  books.forEach(b => sel.appendChild(new Option(`${b.title}（${b.genre}）`, b.id)));
+  if (prev) sel.value = prev;
 }
 
-// ── 2. 借閱操作 ────────────────────────────────────────────────────────────
+// ── 新增書籍 ──────────────────────────────────────────────────────────────
+async function addBook() {
+  const title  = document.getElementById('add-title').value.trim();
+  const genre  = document.getElementById('add-genre').value;
+  const author = document.getElementById('add-author').value.trim();
+
+  if (!title) { toast('請輸入書名', 'error'); return; }
+
+  try {
+    await api('/api/books', {
+      method: 'POST',
+      body: JSON.stringify({ title, genre, author: author || undefined }),
+    });
+    toast(`✅ 已新增《${title}》`);
+    document.getElementById('add-title').value  = '';
+    document.getElementById('add-author').value = '';
+    await Promise.all([loadBooks(), loadBookSelect()]);
+  } catch (e) {
+    toast(`❌ ${e.message}`, 'error');
+  }
+}
+
+// ── 編輯書籍（原位修改） ───────────────────────────────────────────────────
+function editBook(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (!tr || tr.classList.contains('editing')) return;
+
+  const title  = tr.dataset.title;
+  const genre  = tr.dataset.genre;
+  const author = tr.dataset.author;
+
+  tr.classList.add('editing');
+  const cells = tr.querySelectorAll('td');
+  // 書名
+  cells[1].innerHTML = `<input type="text" value="${esc(title)}" style="min-width:120px">`;
+  // 類型
+  cells[2].innerHTML = genreSelect(genre);
+  // 作者
+  cells[3].innerHTML = `<input type="text" value="${esc(author)}" style="min-width:100px">`;
+  // 操作按鈕
+  cells[4].innerHTML = `<div class="ops-cell">
+    <button class="btn btn-sm btn-success" onclick="saveBook(${id})">儲存</button>
+    <button class="btn btn-sm btn-ghost"   onclick="cancelEdit(${id})">取消</button>
+  </div>`;
+}
+
+async function saveBook(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (!tr) return;
+
+  const cells  = tr.querySelectorAll('td');
+  const title  = cells[1].querySelector('input').value.trim();
+  const genre  = cells[2].querySelector('select').value;
+  const author = cells[3].querySelector('input').value.trim();
+
+  if (!title) { toast('書名不能為空', 'error'); return; }
+
+  try {
+    await api(`/api/books/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ title, genre, author: author || null }),
+    });
+    toast(`✅ 已更新《${title}》`);
+    // 更新 data 屬性並還原靜態顯示
+    tr.dataset.title  = title;
+    tr.dataset.genre  = genre;
+    tr.dataset.author = author;
+    tr.classList.remove('editing');
+    const cells2 = tr.querySelectorAll('td');
+    cells2[1].innerHTML = `<strong>${esc(title)}</strong>`;
+    cells2[2].innerHTML = `<span class="genre genre-${genre}">${genre}</span>`;
+    cells2[3].innerHTML = `<span style="color:var(--muted)">${esc(author || '—')}</span>`;
+    cells2[4].innerHTML = `<div class="ops-cell">
+      <button class="btn btn-sm btn-outline" onclick="editBook(${id})">編輯</button>
+      <button class="btn btn-sm btn-danger"  onclick="deleteBook(${id})">刪除</button>
+    </div>`;
+    loadBookSelect();
+  } catch (e) {
+    toast(`❌ ${e.message}`, 'error');
+  }
+}
+
+function cancelEdit(id) {
+  const tr = document.querySelector(`tr[data-id="${id}"]`);
+  if (!tr) return;
+
+  const title  = tr.dataset.title;
+  const genre  = tr.dataset.genre;
+  const author = tr.dataset.author;
+
+  tr.classList.remove('editing');
+  const cells = tr.querySelectorAll('td');
+  cells[1].innerHTML = `<strong>${esc(title)}</strong>`;
+  cells[2].innerHTML = `<span class="genre genre-${genre}">${genre}</span>`;
+  cells[3].innerHTML = `<span style="color:var(--muted)">${esc(author || '—')}</span>`;
+  cells[4].innerHTML = `<div class="ops-cell">
+    <button class="btn btn-sm btn-outline" onclick="editBook(${id})">編輯</button>
+    <button class="btn btn-sm btn-danger"  onclick="deleteBook(${id})">刪除</button>
+  </div>`;
+}
+
+// ── 刪除書籍 ──────────────────────────────────────────────────────────────
+async function deleteBook(id) {
+  const tr    = document.querySelector(`tr[data-id="${id}"]`);
+  const title = tr?.dataset.title ?? `#${id}`;
+
+  if (!confirm(`確定要刪除《${title}》？\n連同所有借閱紀錄一併刪除，此操作無法復原。`)) return;
+
+  try {
+    await api(`/api/books/${id}`, { method: 'DELETE' });
+    toast(`🗑️ 已刪除《${title}》`);
+    tr?.remove();
+    loadBookSelect();
+  } catch (e) {
+    toast(`❌ ${e.message}`, 'error');
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+// 2. 借閱操作
+// ══════════════════════════════════════════════════════════════
+
 async function submitBorrow(e) {
   e.preventDefault();
-  const book_id      = document.getElementById('borrow-book').value;
+  const book_id       = document.getElementById('borrow-book').value;
   const borrower_name = document.getElementById('borrow-name').value.trim();
-  const borrow_date  = document.getElementById('borrow-date').value;
+  const borrow_date   = document.getElementById('borrow-date').value;
 
   if (!book_id || !borrower_name || !borrow_date) {
     toast('請填寫所有欄位', 'error'); return;
   }
+
+  const msgEl = document.getElementById('borrow-msg');
+
   try {
     await api('/api/borrow', {
       method: 'POST',
       body: JSON.stringify({ book_id: Number(book_id), borrower_name, borrow_date }),
     });
-    toast(`✅ 借閱成功！${borrower_name} 已借出書籍`);
+
+    // 借閱區內顯示成功訊息，3 秒後消失
+    msgEl.style.color   = '#16a34a';
+    msgEl.textContent   = `✅ 借閱成功！${borrower_name} 已借出書籍`;
+    clearTimeout(msgEl._t);
+    msgEl._t = setTimeout(() => { msgEl.textContent = ''; }, 3000);
+
     document.getElementById('borrow-form').reset();
-    loadBorrowerSelect();   // 更新推薦區的借閱者名單
+    document.getElementById('borrow-date').value = new Date().toISOString().slice(0, 10);
+
+    // 更新推薦區的借閱者名單
+    loadBorrowerSelect();
   } catch (err) {
-    toast(`❌ ${err.message}`, 'error');
+    msgEl.style.color = '#dc2626';
+    msgEl.textContent = `❌ ${err.message}`;
+    clearTimeout(msgEl._t);
+    msgEl._t = setTimeout(() => { msgEl.textContent = ''; }, 4000);
   }
 }
 
-// ── 3. 個人化推薦 ──────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// 3. 個人化推薦
+// ══════════════════════════════════════════════════════════════
+
 async function loadBorrowerSelect() {
   try {
     const names = await api('/api/borrowers');
-    const sel = document.getElementById('rec-name-select');
-    const prev = sel.value;
+    const sel   = document.getElementById('rec-name-select');
+    const prev  = sel.value;
     sel.innerHTML = '<option value="">— 從名單選取 —</option>';
-    names.forEach(n => {
-      const opt = new Option(n, n);
-      sel.appendChild(opt);
-    });
+    names.forEach(n => sel.appendChild(new Option(n, n)));
     if (prev) sel.value = prev;
   } catch (_) {}
 }
@@ -460,44 +677,43 @@ async function loadRec() {
       api(`/api/borrowers/${encodeURIComponent(name)}/recommendations`),
     ]);
 
-    // badge
-    document.getElementById('rec-badge').innerHTML = `
-      <div class="type-badge" style="background:${typeData.color}">
-        ${typeEmoji(typeData.type)} ${typeData.type}
-      </div>
-    `;
+    // a. 類型 badge
+    document.getElementById('rec-badge').innerHTML =
+      `<div class="type-badge" style="background:${typeData.color}">
+        ${typeEmoji(typeData.type)} ${esc(typeData.type)}
+      </div>`;
 
     // 描述
     document.getElementById('rec-desc').textContent =
       `${typeData.description}　推薦策略：${typeData.recommendation_strategy}`;
 
-    // 特徵數值
+    // b. 特徵數值
     document.getElementById('rec-features').innerHTML = `
       <div class="feature-box">
         <div class="f-val">${typeData.total_borrows}</div>
-        <div class="f-key">total_borrows（總借閱次數）</div>
+        <div class="f-key">總借閱次數（total_borrows）</div>
       </div>
       <div class="feature-box">
         <div class="f-val" style="color:${typeData.color}">${(typeData.top_genre_ratio * 100).toFixed(0)}%</div>
-        <div class="f-key">top_genre_ratio（偏好集中度）</div>
+        <div class="f-key">偏好集中度（top_genre_ratio）</div>
       </div>
       <div class="feature-box">
-        <div class="f-val" style="font-size:1.1rem">${GENRE_ICON[typeData.top_genre] || ''} ${typeData.top_genre}</div>
-        <div class="f-key">top_genre（主要類型）</div>
-      </div>
-    `;
+        <div class="f-val" style="font-size:1.1rem">${GENRE_ICON[typeData.top_genre] || ''} ${esc(typeData.top_genre)}</div>
+        <div class="f-key">主要借閱類型（top_genre）</div>
+      </div>`;
 
-    // 推薦書單
+    // c. 推薦書單
     document.getElementById('rec-list').innerHTML = recs.length
       ? recs.map(b => `
           <div class="rec-item">
             <div class="ri-icon">${GENRE_ICON[b.genre] || '📘'}</div>
             <div class="ri-info">
               <div class="ri-title">${esc(b.title)}</div>
-              <div class="ri-meta">${esc(b.author ?? '—')} &nbsp;·&nbsp; <span class="genre genre-${b.genre}" style="font-size:.72rem">${b.genre}</span></div>
+              <div class="ri-meta">${esc(b.author ?? '—')} &nbsp;·&nbsp;
+                <span class="genre genre-${b.genre}" style="font-size:.72rem">${b.genre}</span>
+              </div>
             </div>
-          </div>
-        `).join('')
+          </div>`).join('')
       : '<div style="color:var(--muted);font-size:.88rem">此借閱者已借過所有相關書籍</div>';
 
     resultDiv.style.display = 'block';
@@ -506,17 +722,8 @@ async function loadRec() {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
-function esc(s) {
-  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-function typeEmoji(t) {
-  return { '專注型重度讀者':'🎯','博覽型重度讀者':'🌐','專注型輕度讀者':'🔍','探索型輕度讀者':'🧭' }[t] || '';
-}
-
 // ── 初始化 ─────────────────────────────────────────────────────────────────
 (async () => {
-  // 設定借閱日期預設為今天
   document.getElementById('borrow-date').value = new Date().toISOString().slice(0, 10);
   await Promise.all([loadBooks(), loadBookSelect(), loadBorrowerSelect()]);
 })();
