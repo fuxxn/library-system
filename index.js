@@ -279,6 +279,9 @@ app.get('/api/borrowers/:name/recommendations', (req, res) => {
   res.json(books.slice(0, 5));
 });
 
+// ── Health check（供外部 ping 服務使用，防止 Render 冷啟動） ──────────────────
+app.get('/health', (_req, res) => res.json({ status: 'ok' }));
+
 // ── 啟動伺服器 ────────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`🚀 圖書借閱者分類與推薦系統 → http://localhost:${PORT}`);
