@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: library-system
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node index.js
+    envVars:
+      - key: NODE_VERSION
+        value: 22.5.0
