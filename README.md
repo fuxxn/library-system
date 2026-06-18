@@ -2,6 +2,8 @@
 
 以 Node.js + Express 建立的全端 Web 應用程式，透過多層決策樹將借閱者分成四種類型，並依據分類給出個人化推薦書單。決策樹的門檻值由 `compute_ig.js` 對實際借閱資料計算**資訊增益（Information Gain）**自動決定，而非手動設定。
 
+**線上 Demo**：https://library-system-jhhn.onrender.com/
+
 ## 環境需求
 
 - Node.js **v22.5.0 以上**（使用內建 `node:sqlite`，不需額外安裝資料庫驅動）
