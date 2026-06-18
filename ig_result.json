@@ -1,0 +1,17 @@
+{
+  "layer1": {
+    "feature": "total_borrows",
+    "threshold": 11.5,
+    "ig": 0.998363672593813
+  },
+  "layer2A": {
+    "feature": "top_genre_ratio",
+    "threshold": 0.5166666666666667,
+    "ig": 1
+  },
+  "layer2B": {
+    "feature": "top_genre_ratio",
+    "threshold": 0.7083333333333333,
+    "ig": 1
+  }
+}
