@@ -125,3 +125,77 @@ library-system/
 | 博覽型重度讀者 | 5 | 15–25 次 | ~20%（均衡分散） |
 | 專注型輕度讀者 | 5 | 4–8 次 | ≥ 85%（同一類型） |
 | 探索型輕度讀者 | 5 | 3–7 次 | ≤ 40%（類型分散） |
+
+---
+
+## 題目 B 作業規格符合度檢查
+
+### 3.2 資料表設計
+
+| 要求欄位 | 狀態 |
+|---------|------|
+| `books`: id、title、genre (NOT NULL)、author（可空） | ✅ 完全符合 |
+| `borrow_records`: id、book_id (FK)、borrower_name、borrow_date | ✅ 完全符合 |
+
+### 3.3 特徵計算
+
+| 要求 | 狀態 |
+|-----|------|
+| 總借閱次數：COUNT(*) GROUP BY borrower_name | ✅ `getBorrowerFeatures()` 實作 |
+| 單一類型佔比：最常借類型次數 ÷ 總借閱次數 | ✅ `top_genre_ratio` SQL 計算 |
+
+### 3.4 種子資料規模
+
+| 要求 | 實作 | 狀態 |
+|-----|------|------|
+| 50 本書，5 種類型平均分配 | 50 本，各類型 10 本 | ✅ |
+| 200 筆借閱紀錄 | ~255 筆 | ✅（超額） |
+| 5 位借閱多（15–25 次）且集中 80%+ | 16–24 次，85%+ | ✅ |
+| 5 位借閱多但類型分散 | 15–25 次，均衡分散 | ✅ |
+| 5 位借閱少（3–8 次）且集中 80%+ | 4–8 次，85%+ | ✅ |
+| 5 位借閱少且類型分散 | 3–7 次，≤ 40% | ✅ |
+
+### 3.5 進階做法（加分）
+
+| 要求 | 狀態 |
+|-----|------|
+| 從更多候選特徵實際計算資訊增益，找出最佳特徵與門檻值 | ✅ `compute_ig.js` 考慮 4 個候選特徵（含 `distinct_books`、`avg_interval`），IG = 0.998–1.000，100% 準確率 |
+
+### 3.6 API 端點
+
+| PDF 要求 | 實作路徑 | 狀態 |
+|---------|---------|------|
+| GET /books | GET /api/books | ✅ |
+| POST /books | POST /api/books | ✅ |
+| PUT /books/:id | PUT /api/books/:id | ✅ |
+| DELETE /books/:id | DELETE /api/books/:id | ✅ |
+| POST /borrow | POST /api/borrow | ✅ |
+| GET /borrowers/:name/type | GET /api/borrowers/:name/type | ✅ |
+| GET /borrowers/:name/recommendations | GET /api/borrowers/:name/recommendations | ✅ |
+
+### 3.7 前端功能
+
+| 要求 | 狀態 |
+|-----|------|
+| 書籍列表可依類型篩選 | ✅ |
+| 借閱操作：選書、填姓名、選日期後送出 | ✅ |
+| 個人化推薦：輸入姓名 → 顯示類型標籤 + 推薦書單 | ✅ |
+| （加分）書籍新增 / 編輯 / 刪除 | ✅ 超額完成 |
+
+### 1.3 決策樹設計提醒
+
+| 提醒 | 狀態 |
+|-----|------|
+| 多層分支：先判斷一個特徵，再依結果判斷下一個特徵 | ✅ 兩層巢狀：Layer 1 → total_borrows；Layer 2A/2B → top_genre_ratio |
+| 資料有訊號：刻意安排規律，非純隨機 | ✅ 種子資料設計 4 種明確模式，各 5 人 |
+| 生成後檢查資料：確認規律確實存在 | ✅ `compute_ig.js` 輸出特徵數值表與逐人分類驗證（100% 準確率） |
+
+### 5.1–5.2 評分核心考點
+
+| 考核項目 | 狀態 |
+|---------|------|
+| 借閱操作正確寫入 borrow_records | ✅ POST /api/borrow |
+| 個人化推薦正確呼叫 API 取得分類與推薦結果 | ✅ /api/borrowers/:name/type + /recommendations |
+| 決策樹依兩個特徵（次數 + 佔比）多層分支運作 | ✅ 兩層決策樹 |
+| 分類結果確實影響推薦書單的呈現方式 | ✅ 四種策略各不相同 |
+| 資訊增益進階做法 | ✅ `compute_ig.js` + `ig_result.json` |
