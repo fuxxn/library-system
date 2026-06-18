@@ -68,6 +68,8 @@ function getBorrowerFeatures(name) {
   return row;
 }
 
+const VALID_GENRES = ['小說', '科普', '商業', '歷史', '漫畫'];
+
 // ── API: 書籍 ─────────────────────────────────────────────────────────────────
 
 // GET /api/books?genre=小說
@@ -88,9 +90,8 @@ app.post('/api/books', (req, res) => {
   if (!title || !genre) {
     return res.status(400).json({ error: '書名（title）與類型（genre）為必填' });
   }
-  const validGenres = ['小說', '科普', '商業', '歷史', '漫畫'];
-  if (!validGenres.includes(genre)) {
-    return res.status(400).json({ error: `類型必須是：${validGenres.join('、')}` });
+  if (!VALID_GENRES.includes(genre)) {
+    return res.status(400).json({ error: `類型必須是：${VALID_GENRES.join('、')}` });
   }
   const result = db.prepare(
     'INSERT INTO books (title, genre, author) VALUES (?, ?, ?)'
@@ -104,13 +105,16 @@ app.put('/api/books/:id', (req, res) => {
   const existing = db.prepare('SELECT * FROM books WHERE id = ?').get(id);
   if (!existing) return res.status(404).json({ error: '找不到該書籍' });
 
-  const title  = req.body?.title  ?? existing.title;
-  const genre  = req.body?.genre  ?? existing.genre;
-  const author = req.body?.author ?? existing.author;
+  // fix: 用 !== undefined 而非 ??，避免空字串靜默覆寫現有值
+  const title  = req.body?.title  !== undefined ? req.body.title  : existing.title;
+  const genre  = req.body?.genre  !== undefined ? req.body.genre  : existing.genre;
+  const author = req.body?.author !== undefined ? req.body.author : existing.author;
 
-  const validGenres = ['小說', '科普', '商業', '歷史', '漫畫'];
-  if (!validGenres.includes(genre)) {
-    return res.status(400).json({ error: `類型必須是：${validGenres.join('、')}` });
+  if (!title) {
+    return res.status(400).json({ error: '書名（title）不能為空' });
+  }
+  if (!VALID_GENRES.includes(genre)) {
+    return res.status(400).json({ error: `類型必須是：${VALID_GENRES.join('、')}` });
   }
 
   db.prepare('UPDATE books SET title = ?, genre = ?, author = ? WHERE id = ?')
@@ -141,8 +145,13 @@ app.post('/api/borrow', (req, res) => {
   const book = db.prepare('SELECT id FROM books WHERE id = ?').get(Number(book_id));
   if (!book) return res.status(404).json({ error: '找不到該書籍' });
 
+  // fix: 驗證格式 + 語意（拒絕 2024-02-30、9999-99-99 等不存在日期）
   if (!/^\d{4}-\d{2}-\d{2}$/.test(borrow_date)) {
     return res.status(400).json({ error: 'borrow_date 格式應為 YYYY-MM-DD' });
+  }
+  const parsed = new Date(borrow_date);
+  if (isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== borrow_date) {
+    return res.status(400).json({ error: 'borrow_date 不是有效的日期' });
   }
 
   const result = db.prepare(
@@ -171,14 +180,14 @@ app.get('/api/borrowers/:name/type', (req, res) => {
     return res.status(404).json({ error: '找不到該借閱者的紀錄' });
   }
 
-  const ratio = Math.round(features.top_genre_ratio * 100) / 100;
-  const result = classify(features.total_borrows, ratio);
+  // fix: classify 使用原始 ratio（避免四捨五入跨越門檻），回傳欄位才四捨五入至顯示用精度
+  const result = classify(features.total_borrows, features.top_genre_ratio);
 
   res.json({
     borrower_name:   name,
     total_borrows:   features.total_borrows,
     top_genre:       features.top_genre,
-    top_genre_ratio: ratio,
+    top_genre_ratio: Math.round(features.top_genre_ratio * 100) / 100,
     ...result,
   });
 });
@@ -192,17 +201,19 @@ app.get('/api/borrowers/:name/recommendations', (req, res) => {
     return res.status(404).json({ error: '找不到該借閱者的紀錄' });
   }
 
-  const ratio = Math.round(features.top_genre_ratio * 100) / 100;
-  const { type } = classify(features.total_borrows, ratio);
+  // fix: classify 使用原始 ratio
+  const { type } = classify(features.total_borrows, features.top_genre_ratio);
 
-  // 已借過的書 id（排除用）
+  // 已借過的書 id
   const borrowedIds = db.prepare(
     'SELECT DISTINCT book_id FROM borrow_records WHERE borrower_name = ?'
   ).all(name).map(r => r.book_id);
 
-  const excludeClause = borrowedIds.length
-    ? `AND b.id NOT IN (${borrowedIds.join(',')})`
-    : '';
+  // fix: 用 ? 佔位符參數化 NOT IN，避免字串拼接；建立帶別名與不帶別名兩種版本
+  const ph = borrowedIds.map(() => '?').join(',');
+  const excB  = borrowedIds.length ? `AND b.id NOT IN (${ph})` : '';   // 有別名 b
+  const excId = borrowedIds.length ? `AND id NOT IN (${ph})` : '';     // 無別名（單表查詢）
+  const whereB = borrowedIds.length ? `WHERE b.id NOT IN (${ph})` : ''; // 探索型開頭 WHERE
 
   let books = [];
 
@@ -212,27 +223,24 @@ app.get('/api/borrowers/:name/recommendations', (req, res) => {
       SELECT b.id, b.title, b.genre, b.author, COUNT(br.id) AS borrow_count
       FROM books b
       LEFT JOIN borrow_records br ON br.book_id = b.id
-      WHERE b.genre = ? ${excludeClause}
+      WHERE b.genre = ? ${excB}
       GROUP BY b.id
       ORDER BY borrow_count DESC
       LIMIT 5
-    `).all(features.top_genre);
+    `).all(features.top_genre, ...borrowedIds);
 
   } else if (type === '博覽型重度讀者') {
     // 各類型各選一本（按被借次數排序，取第一名）
-    for (const g of ['小說', '科普', '商業', '歷史', '漫畫']) {
-      const excludeG = borrowedIds.length
-        ? `AND b.id NOT IN (${borrowedIds.join(',')})`
-        : '';
+    for (const g of VALID_GENRES) {
       const book = db.prepare(`
         SELECT b.id, b.title, b.genre, b.author, COUNT(br.id) AS borrow_count
         FROM books b
         LEFT JOIN borrow_records br ON br.book_id = b.id
-        WHERE b.genre = ? ${excludeG}
+        WHERE b.genre = ? ${excB}
         GROUP BY b.id
         ORDER BY borrow_count DESC
         LIMIT 1
-      `).get(g);
+      `).get(g, ...borrowedIds);
       if (book) books.push(book);
     }
 
@@ -242,29 +250,30 @@ app.get('/api/borrowers/:name/recommendations', (req, res) => {
       SELECT b.id, b.title, b.genre, b.author, COUNT(br.id) AS borrow_count
       FROM books b
       LEFT JOIN borrow_records br ON br.book_id = b.id
-      WHERE b.genre = ? ${excludeClause}
+      WHERE b.genre = ? ${excB}
       GROUP BY b.id
       ORDER BY borrow_count DESC
       LIMIT 5
-    `).all(features.top_genre);
-    // 若不足 3 本，補全同類型書
+    `).all(features.top_genre, ...borrowedIds);
+
+    // fix: fallback 仍套用排除條件，不回傳已借過的書
     if (books.length < 3) {
       books = db.prepare(
-        'SELECT id, title, genre, author FROM books WHERE genre = ? LIMIT 5'
-      ).all(features.top_genre);
+        `SELECT id, title, genre, author FROM books WHERE genre = ? ${excId} LIMIT 5`
+      ).all(features.top_genre, ...borrowedIds);
     }
 
   } else {
-    // 探索型輕度讀者：全站最受歡迎的書（未借過）
+    // 探索型輕度讀者：全站最受歡迎（未借過）
     books = db.prepare(`
       SELECT b.id, b.title, b.genre, b.author, COUNT(br.id) AS borrow_count
       FROM books b
       LEFT JOIN borrow_records br ON br.book_id = b.id
-      ${excludeClause.replace('AND b.id', 'WHERE b.id')}
+      ${whereB}
       GROUP BY b.id
       ORDER BY borrow_count DESC
       LIMIT 5
-    `).all();
+    `).all(...borrowedIds);
   }
 
   res.json(books.slice(0, 5));
